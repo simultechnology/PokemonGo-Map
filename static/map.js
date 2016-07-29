@@ -213,107 +213,43 @@ function removePokemonMarker(encounter_id) {
 }
 
 function initMap() {
-  map = new google.maps.Map(document.getElementById('map'), {
-    center: {
-      lat: center_lat,
-      lng: center_lng
-    },
-    zoom: 16,
-    fullscreenControl: true,
-    streetViewControl: false,
-    mapTypeControl: true,
-    mapTypeControlOptions: {
-      style: google.maps.MapTypeControlStyle.DROPDOWN_MENU,
-      position: google.maps.ControlPosition.RIGHT_TOP,
-      mapTypeIds: [
-        google.maps.MapTypeId.ROADMAP,
-        google.maps.MapTypeId.SATELLITE,
-        'nolabels_style',
-        'dark_style',
-        'style_light2',
-        'style_pgo',
-        'dark_style_nl',
-        'style_light2_nl',
-        'style_pgo_nl'
-      ]
-    },
+  map = new ZDC.Map(document.getElementById('map'), {
+    latlon: new ZDC.LatLon(center_lat, center_lng),
+    mapType: ZDC.MAPTYPE_HIGHRESOLUTION,
+    zoom: 10
   });
 
-  var style_NoLabels = new google.maps.StyledMapType(noLabelsStyle, {
-    name: "No Labels"
-  });
-  map.mapTypes.set('nolabels_style', style_NoLabels);
-
-  var style_dark = new google.maps.StyledMapType(darkStyle, {
-    name: "Dark"
-  });
-  map.mapTypes.set('dark_style', style_dark);
-
-  var style_light2 = new google.maps.StyledMapType(light2Style, {
-    name: "Light2"
-  });
-  map.mapTypes.set('style_light2', style_light2);
-
-  var style_pgo = new google.maps.StyledMapType(pGoStyle, {
-    name: "PokemonGo"
-  });
-  map.mapTypes.set('style_pgo', style_pgo);
-
-  var style_dark_nl = new google.maps.StyledMapType(darkStyleNoLabels, {
-    name: "Dark (No Labels)"
-  });
-  map.mapTypes.set('dark_style_nl', style_dark_nl);
-
-  var style_light2_nl = new google.maps.StyledMapType(light2StyleNoLabels, {
-    name: "Light2 (No Labels)"
-  });
-  map.mapTypes.set('style_light2_nl', style_light2_nl);
-
-  var style_pgo_nl = new google.maps.StyledMapType(pGoStyleNoLabels, {
-    name: "PokemonGo (No Labels)"
-  });
-  map.mapTypes.set('style_pgo_nl', style_pgo_nl);
-
-  map.addListener('maptypeid_changed', function(s) {
-    Store.set('map_style', this.mapTypeId);
-  });
-
-  map.setMapTypeId(Store.get('map_style'));
-  google.maps.event.addListener(map, 'idle', updateMap);
+  ZDC.addListener(map, 'idle', updateMap);
 
   var marker = createSearchMarker();
 
   addMyLocationButton();
   initSidebar();
-  google.maps.event.addListenerOnce(map, 'idle', function() {
+  ZDC.addListener(map, 'idle', function() {
     updateMap();
   });
 
-  google.maps.event.addListener(map, 'zoom_changed', function() {
+  ZDC.addListener(map, 'zoom_changed', function() {
     redrawPokemon(map_data.pokemons);
     redrawPokemon(map_data.lure_pokemons);
   });
 }
 
 function createSearchMarker() {
-  marker = new google.maps.Marker({ //need to keep reference.
-    position: {
-      lat: center_lat,
-      lng: center_lng
-    },
-    map: map,
-    animation: google.maps.Animation.DROP,
-    draggable: true
-  });
+  marker = new ZDC.Marker(//need to keep reference.
+    new ZDC.LatLon(center_lat, center_lng)
+  );
+
+  map.addWidget(marker);
 
   var oldLocation = null;
-  google.maps.event.addListener(marker, 'dragstart', function() {
-    oldLocation = marker.getPosition();
+  ZDC.addListener(marker, ZDC.MARKER_MOUSEDOWN, function() {
+    oldLocation = marker.getLatLon();
   });
 
-  google.maps.event.addListener(marker, 'dragend', function() {
-    var newLocation = marker.getPosition();
-    changeSearchLocation(newLocation.lat(), newLocation.lng())
+  ZDC.addListener(marker, ZDC.MARKER_MOUSEUP, function() {
+    var newLocation = marker.getLatLon();
+    changeSearchLocation(newLocation.lat, newLocation.lon)
       .done(function() {
         oldLocation = null;
       })
@@ -336,20 +272,6 @@ function initSidebar() {
   $('#geoloc-switch').prop('checked', Store.get('geoLocate'));
   $('#scanned-switch').prop('checked', Store.get('showScanned'));
   $('#sound-switch').prop('checked', Store.get('playSound'));
-
-  var searchBox = new google.maps.places.SearchBox(document.getElementById('next-location'));
-  $("#next-location").css("background-color", $('#geoloc-switch').prop('checked') ? "#e0e0e0" : "#ffffff");
-
-  searchBox.addListener('places_changed', function() {
-    var places = searchBox.getPlaces();
-
-    if (places.length == 0) {
-      return;
-    }
-
-    var loc = places[0].geometry.location;
-    changeLocation(loc.lat(), loc.lng());
-  });
 
   var icons = $('#pokemon-icons');
   $.each(pokemon_sprites, function(key, value) {
@@ -507,12 +429,12 @@ function getGoogleSprite(index, sprite, display_height) {
   display_height = Math.max(display_height, 3);
   var scale = display_height / sprite.icon_height;
   // Crop icon just a tiny bit to avoid bleedover from neighbor
-  var scaled_icon_size = new google.maps.Size(scale * sprite.icon_width - 1, scale * sprite.icon_height - 1);
-  var scaled_icon_offset = new google.maps.Point(
+  var scaled_icon_size = new ZDC.WH(scale * sprite.icon_width - 1, scale * sprite.icon_height - 1);
+  var scaled_icon_offset = new ZDC.TL(
     (index % sprite.columns) * sprite.icon_width * scale + 0.5,
     Math.floor(index / sprite.columns) * sprite.icon_height * scale + 0.5);
-  var scaled_sprite_size = new google.maps.Size(scale * sprite.sprite_width, scale * sprite.sprite_height);
-  var scaled_icon_center_offset = new google.maps.Point(scale * sprite.icon_width / 2, scale * sprite.icon_height / 2);
+  var scaled_sprite_size = new ZDC.WH(scale * sprite.sprite_width, scale * sprite.sprite_height);
+  var scaled_icon_center_offset = new ZDC.TL(scale * sprite.icon_width / 2, scale * sprite.icon_height / 2);
 
   return {
     url: sprite.filename,
@@ -535,27 +457,28 @@ function setupPokemonMarker(item, skipNotification, isBounceDisabled) {
     animationDisabled = true;
   }
 
-  var marker = new google.maps.Marker({
-    position: {
-      lat: item.latitude,
-      lng: item.longitude
-    },
-    zIndex: 9999,
-    optimized: false,
-    map: map,
-    icon: icon,
-    animationDisabled: animationDisabled,
-  });
+  var latlon = new ZDC.LatLon(item.latitude, item.longitude);
 
-  marker.addListener('click', function() {
+  var marker = new ZDC.Marker(latlon, {
+    custom: {
+      base: {
+        src: icon.url,
+        imgSize: new ZDC.WH(sprite.icon_width, sprite.icon_height),
+        imgTL: new ZDC.TL(icon.origin.top, icon.origin.left)
+      }
+    }
+  });
+  map.addWidget(marker);
+
+  ZDC.addListener(marker, ZDC.MARKER_MOUSEDOWN, function() {
     this.setAnimation(null);
     this.animationDisabled = true;
   });
 
-  marker.infoWindow = new google.maps.InfoWindow({
-    content: pokemonLabel(item.pokemon_name, item.disappear_time, item.pokemon_id, item.latitude, item.longitude, item.encounter_id),
-    disableAutoPan: true
+  var msgInfo = new ZDC.MsgInfo(latlon, {
+    html: pokemonLabel(item.pokemon_name, item.disappear_time, item.pokemon_id, item.latitude, item.longitude, item.encounter_id)
   });
+  map.addWidget(msgInfo);
 
   if (notifiedPokemon.indexOf(item.pokemon_id) > -1) {
     if (!skipNotification) {
@@ -564,17 +487,17 @@ function setupPokemonMarker(item, skipNotification, isBounceDisabled) {
       }
       sendNotification('A wild ' + item.pokemon_name + ' appeared!', 'Click to load map', 'static/icons/' + item.pokemon_id + '.png', item.latitude, item.longitude);
     }
-    if (marker.animationDisabled != true) {
-      marker.setAnimation(google.maps.Animation.BOUNCE);
-    }
+    // if (marker.animationDisabled != true) {
+    //   marker.setAnimation(ZDC.Animation.BOUNCE);
+    // }
   }
 
-  addListeners(marker);
+  addListeners(marker, msgInfo);
   return marker;
 }
 
 function setupGymMarker(item) {
-  var marker = new google.maps.Marker({
+  var marker = new ZDC.Marker({
     position: {
       lat: item.latitude,
       lng: item.longitude
@@ -583,7 +506,7 @@ function setupGymMarker(item) {
     icon: 'static/forts/' + gym_types[item.team_id] + '.png'
   });
 
-  marker.infoWindow = new google.maps.InfoWindow({
+  marker.infoWindow = new ZDC.InfoWindow({
     content: gymLabel(gym_types[item.team_id], item.team_id, item.gym_points, item.latitude, item.longitude),
     disableAutoPan: true
   });
@@ -593,24 +516,24 @@ function setupGymMarker(item) {
 }
 
 function setupPokestopMarker(item) {
+  var latlon = new ZDC.LatLon(item.latitude, item.longitude);
   var imagename = !!item.lure_expiration ? "PstopLured" : "Pstop";
-  var marker = new google.maps.Marker({
-    position: {
-      lat: item.latitude,
-      lng: item.longitude,
-    },
-    map: map,
-    zIndex: 2,
-    optimized: false,
-    icon: 'static/forts/' + imagename + '.png',
+  var marker = new ZDC.Marker(latlon,
+    {
+      custom: {
+        base : {
+          src: 'static/forts/' + imagename + '.png'
+        }
+      }
+    }
+  );
+  map.addWidget(marker);
+
+  var msgInfo = new ZDC.MsgInfo(latlon, {
+    html: pokestopLabel(!!item.lure_expiration, item.last_modified, item.active_pokemon_id, item.latitude + .003, item.longitude + .003)
   });
 
-  marker.infoWindow = new google.maps.InfoWindow({
-    content: pokestopLabel(!!item.lure_expiration, item.last_modified, item.active_pokemon_id, item.latitude + .003, item.longitude + .003),
-    disableAutoPan: true
-  });
-
-  addListeners(marker);
+  addListeners(marker, msgInfo);
   return marker;
 }
 
@@ -628,9 +551,9 @@ function getColorByDate(value) {
 }
 
 function setupScannedMarker(item) {
-  var circleCenter = new google.maps.LatLng(item.latitude, item.longitude);
+  var circleCenter = new ZDC.LatLon(item.latitude, item.longitude);
 
-  var marker = new google.maps.Circle({
+  var marker = new ZDC.Circle({
     map: map,
     center: circleCenter,
     radius: 100, // 10 miles in metres
@@ -649,27 +572,26 @@ function clearSelection() {
   }
 }
 
-function addListeners(marker) {
-  marker.addListener('click', function() {
-    marker.infoWindow.open(map, marker);
+function addListeners(marker, msgInfo) {
+  ZDC.addListener(marker, ZDC.MARKER_MOUSEDOWN, function() {
+    msgInfo.open();
     clearSelection();
     updateLabelDiffTime();
-    marker.persist = true;
   });
 
-  google.maps.event.addListener(marker.infoWindow, 'closeclick', function() {
+  ZDC.addListener(msgInfo, ZDC.MSGINFO_CLOSE, function() {
     marker.persist = null;
   });
 
-  marker.addListener('mouseover', function() {
-    marker.infoWindow.open(map, marker);
+  ZDC.addListener(marker, ZDC.MARKER_MOUSEOVER, function() {
+    msgInfo.open();
     clearSelection();
     updateLabelDiffTime();
   });
 
-  marker.addListener('mouseout', function() {
+  ZDC.addListener(marker, ZDC.MARKER_MOUSEOUT, function() {
     if (!marker.persist) {
-      marker.infoWindow.close();
+      msg.close();
     }
   });
 
@@ -718,27 +640,31 @@ function showInBoundsMarkers(markers) {
       }
     }
 
-    if (show && !markers[key].marker.getMap()) {
-      markers[key].marker.setMap(map);
-    } else if (!show && markers[key].marker.getMap()) {
-      markers[key].marker.setMap(null);
-    }
+    // if (show && !markers[key].marker.getMap()) {
+    //   markers[key].marker.setMap(map);
+    // } else if (!show && markers[key].marker.getMap()) {
+    //   markers[key].marker.setMap(null);
+    // }
   });
 }
 
 function loadRawData() {
+  // mapがまだ生成されていない場合は処理を抜ける
+  if (!map) {
+    return;
+  }
   var loadPokemon = Store.get('showPokemon');
   var loadGyms = Store.get('showGyms');
   var loadPokestops = Store.get('showPokestops') || Store.get('showPokemon');
   var loadScanned = Store.get('showScanned');
 
-  var bounds = map.getBounds();
-  var swPoint = bounds.getSouthWest();
-  var nePoint = bounds.getNorthEast();
-  var swLat = swPoint.lat();
-  var swLng = swPoint.lng();
-  var neLat = nePoint.lat();
-  var neLng = nePoint.lng();
+  var bounds = map.getLatLonBox();
+  var swPoint = bounds.getMin();
+  var nePoint = bounds.getMax();
+  var swLat = swPoint.lat;
+  var swLng = swPoint.lon;
+  var neLat = nePoint.lat;
+  var neLng = nePoint.lon;
 
   return $.ajax({
     url: "raw_data",
@@ -858,7 +784,7 @@ function processGyms(i, item) {
       map_data.gyms[item.gym_id].marker.setMap(null);
       map_data.gyms[item.gym_id].marker = setupGymMarker(item);
     } else { // if it hasn't changed generate new label only (in case prestige has changed)
-      map_data.gyms[item.gym_id].marker.infoWindow = new google.maps.InfoWindow({
+      map_data.gyms[item.gym_id].marker.infoWindow = new ZDC.InfoWindow({
         content: gymLabel(gym_types[item.team_id], item.team_id, item.gym_points, item.latitude, item.longitude),
         disableAutoPan: true
       });
@@ -947,7 +873,7 @@ var updateLabelDiffTime = function() {
 };
 
 function getPointDistance(pointA, pointB) {
-  return google.maps.geometry.spherical.computeDistanceBetween(pointA, pointB);
+  return ZDC.geometry.spherical.computeDistanceBetween(pointA, pointB);
 }
 
 function sendNotification(title, text, icon, lat, lng) {
@@ -1011,7 +937,7 @@ function myLocationButton(map, marker) {
     }, 500);
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(function(position) {
-        var latlng = new google.maps.LatLng(position.coords.latitude, position.coords.longitude);
+        var latlng = new ZDC.LatLon(position.coords.latitude, position.coords.longitude);
         locationMarker.setVisible(true);
         locationMarker.setOptions({
           'opacity': 1
@@ -1028,32 +954,29 @@ function myLocationButton(map, marker) {
   });
 
   locationContainer.index = 1;
-  map.controls[google.maps.ControlPosition.RIGHT_BOTTOM].push(locationContainer);
+  // map.controls[ZDC.ControlPosition.RIGHT_BOTTOM].push(locationContainer);
 }
 
 function addMyLocationButton() {
-  locationMarker = new google.maps.Marker({
-    map: map,
-    animation: google.maps.Animation.DROP,
-    position: {
-      lat: center_lat,
-      lng: center_lng
-    },
-    icon: {
-      path: google.maps.SymbolPath.CIRCLE,
-      fillOpacity: 1,
-      fillColor: '#1c8af6',
-      scale: 6,
-      strokeColor: '#1c8af6',
-      strokeWeight: 8,
-      strokeOpacity: 0.3
-    }
-  });
-  locationMarker.setVisible(false);
+  locationMarker = new ZDC.Marker(
+    new ZDC.LatLon(center_lat, center_lng)
+  );
+  //   icon: {
+  //     path: ZDC.SymbolPath.CIRCLE,
+  //     fillOpacity: 1,
+  //     fillColor: '#1c8af6',
+  //     scale: 6,
+  //     strokeColor: '#1c8af6',
+  //     strokeWeight: 8,
+  //     strokeOpacity: 0.3
+  //   }
+  // });
+  map.addWidget(locationMarker);
+  locationMarker.hidden()
 
   myLocationButton(map, locationMarker);
 
-  google.maps.event.addListener(map, 'dragend', function() {
+  ZDC.addListener(map, ZDC.MAP_DRAG_END, function() {
     var currentLocation = document.getElementById('current-location');
     currentLocation.style.backgroundPosition = '0px 0px';
     locationMarker.setOptions({
@@ -1062,20 +985,12 @@ function addMyLocationButton() {
   });
 }
 
-function changeLocation(lat, lng) {
-  var loc = new google.maps.LatLng(lat, lng);
-  changeSearchLocation(lat, lng).done(function() {
-    map.setCenter(loc);
-    marker.setPosition(loc);
-  });
-}
-
 function changeSearchLocation(lat, lng) {
   return $.post("next_loc?lat=" + lat + "&lon=" + lng, {});
 }
 
 function centerMap(lat, lng, zoom) {
-  var loc = new google.maps.LatLng(lat, lng);
+  var loc = new ZDC.LatLon(lat, lng);
 
   map.setCenter(loc);
 
@@ -1169,9 +1084,9 @@ $(function() {
         var lon = position.coords.longitude;
 
         //the search function makes any small movements cause a loop. Need to increase resolution
-        if (getPointDistance(marker.getPosition(), (new google.maps.LatLng(lat, lon))) > 40) {
+        if (getPointDistance(marker.getPosition(), (new ZDC.LatLon(lat, lon))) > 40) {
           $.post(baseURL + "/next_loc?lat=" + lat + "&lon=" + lon).done(function() {
-            var center = new google.maps.LatLng(lat, lon);
+            var center = new ZDC.LatLon(lat, lon);
             map.panTo(center);
             marker.setPosition(center);
           });
